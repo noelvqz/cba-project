@@ -7,6 +7,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.List;
 
 /**
@@ -89,6 +92,15 @@ public class BookController {
         }
         if (isbn.length() != 13) {
             throw new Exception("Invalid ISBN");
+        }
+        if (book.getPubDate() != null) {
+            DateFormat sdf = new SimpleDateFormat("yyyyMMdd");
+            sdf.setLenient(false);
+            try {
+                sdf.parse(book.getPubDate());
+            } catch (ParseException e) {
+                throw new Exception("Invalid Publication Date");
+            }
         }
     }
 
