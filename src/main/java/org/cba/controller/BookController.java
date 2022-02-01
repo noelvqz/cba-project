@@ -1,10 +1,12 @@
 package org.cba.controller;
 
 import org.cba.entity.Book;
+import org.cba.jms.CustomMessage;
 import org.cba.repository.BookRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jms.core.JmsTemplate;
 import org.springframework.stereotype.Component;
 
 import java.text.DateFormat;
@@ -22,6 +24,8 @@ public class BookController {
 
     private BookRepository bookRepository;
 
+    @Autowired private JmsTemplate jmsTemplate;
+
     @Autowired
     public BookController(BookRepository bookRepository) {
         this.bookRepository = bookRepository;
@@ -33,13 +37,12 @@ public class BookController {
             this.validateBook(book);
 
             Book bookDb = bookRepository.findByIsbn(book.getIsbn());
-            if (bookDb == null) {
-                log.debug("Saving...");
-            } else {
-                log.debug("Updating...");
-                book.setId(bookDb.getId());
+            if (bookDb != null) {
+                throw new Exception("Book already exists");
             }
-            return bookRepository.save(book);
+            Book newBook = bookRepository.save(book);
+            this.sendMessageToQueue("Book added");
+            return newBook;
         } finally {
             log.debug("<<<<< addBook: {}");
         }
@@ -56,7 +59,9 @@ public class BookController {
             }
             log.debug("Updating...");
             book.setId(bookDb.getId());
-            return bookRepository.save(book);
+            Book updatedBook = bookRepository.save(book);
+            this.sendMessageToQueue("Book updated");
+            return updatedBook;
         } finally {
             log.debug("<<<<< updateBook: {}");
         }
@@ -77,6 +82,7 @@ public class BookController {
             Book bookDb = bookRepository.findByIsbn(isbn);
             if (bookDb != null) {
                 bookRepository.delete(bookDb);
+                this.sendMessageToQueue("Book deleted");
             }
         } finally {
             log.debug("<<<<< deleteBook: {}");
@@ -102,6 +108,12 @@ public class BookController {
                 throw new Exception("Invalid Publication Date");
             }
         }
+    }
+
+    private void sendMessageToQueue(String message) {
+        CustomMessage customMessage = new CustomMessage();
+        customMessage.setTheMessage(message);
+        jmsTemplate.convertAndSend("messageQueue", customMessage);
     }
 
 }
